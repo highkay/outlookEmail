@@ -165,6 +165,52 @@ class ProxyMailTemplateTests(unittest.TestCase):
                 'socks5h://acct.user:a@127.0.0.1:2260',
             )
 
+    def test_global_proxy_env_fallback_with_mail_template(self):
+        with self.app.app_context():
+            db = web_outlook_app.get_db()
+            db.execute(
+                '''INSERT INTO accounts (email, password, client_id, refresh_token, account_type, provider, group_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                ('Plain.User@example.com', 'p', 'cid', 'rt', 'outlook', 'outlook', 1),
+            )
+            db.commit()
+            account = web_outlook_app.get_account_by_email('Plain.User@example.com')
+
+            with patch.dict(os.environ, {web_outlook_app.GLOBAL_PROXY_URL_ENV: 'socks5h://outlook.{mail}:p@127.0.0.1:2260'}):
+                resolved = web_outlook_app.get_account_resolved_proxy_config(account)
+                self.assertEqual(resolved['proxy_url'], 'socks5h://outlook.plainuser:p@127.0.0.1:2260')
+                self.assertEqual(web_outlook_app.get_account_proxy_url(account), 'socks5h://outlook.plainuser:p@127.0.0.1:2260')
+                self.assertEqual(web_outlook_app.get_account_proxy_failover_urls(account), ['', ''])
+
+    def test_account_proxy_beats_global_env_fallback(self):
+        with self.app.app_context():
+            db = web_outlook_app.get_db()
+            db.execute(
+                '''INSERT INTO accounts
+                   (email, password, client_id, refresh_token, account_type, provider, group_id, proxy_url)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                ('Own.Proxy@example.com', 'p', 'cid', 'rt', 'outlook', 'outlook', 1,
+                 'socks5h://acct.{mail}:a@127.0.0.1:2260'),
+            )
+            db.commit()
+            account = web_outlook_app.get_account_by_email('Own.Proxy@example.com')
+
+            with patch.dict(os.environ, {web_outlook_app.GLOBAL_PROXY_URL_ENV: 'http://global.example:7890'}):
+                self.assertEqual(
+                    web_outlook_app.get_account_proxy_url(account),
+                    'socks5h://acct.ownproxy:a@127.0.0.1:2260',
+                )
+
+    def test_upload_account_global_env_fallback_when_nothing_configured(self):
+        with self.app.app_context():
+            with patch.dict(os.environ, {web_outlook_app.GLOBAL_PROXY_URL_ENV: 'http://global.example:7890'}):
+                resolved = web_outlook_app.get_upload_account_resolved_proxy_config({
+                    'email': 'x@y.com',
+                    'proxy_url': '',
+                    'group_id': None,
+                })
+                self.assertEqual(resolved['proxy_url'], 'http://global.example:7890')
+
     def test_upload_account_proxy_own_then_group_inheritance(self):
         with self.app.app_context():
             group_id = web_outlook_app.add_group(

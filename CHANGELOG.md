@@ -6,6 +6,11 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [3.0.7] - 2026-09-04
+
+### Added
+- 部署级全局代理兜底 `GLOBAL_PROXY_URL`：账号与分组均未配置代理时，拉信、Token 刷新、IMAP socket、Graph/IMAP OAuth 自动授权等出站统一走该环境变量指定的代理；支持 `{mail}` 占位符展开（Resin 粘性代理可用）。账号/分组已配置的代理优先级不变。
+
 ## [3.0.6] - 2026-08-20
 
 ### Added

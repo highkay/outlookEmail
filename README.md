@@ -169,6 +169,8 @@ python -c 'import secrets; print(secrets.token_hex(32))'
 
 可选：普通 Outlook/IMAP 邮箱读取邮件列表的整体超时默认为 120 秒，可在「系统设置 -> 常规设置 -> 邮件获取超时」中调整（30-300 秒）；也可在首次启动前通过 `.env.local` 的 `MAIL_FETCH_OVERALL_TIMEOUT` 设置初始值。该值应小于 `GUNICORN_TIMEOUT`（默认 300 秒）。
 
+可选：当账号与分组均未配置代理时，可用 `.env.local` / 容器环境变量 `GLOBAL_PROXY_URL` 指定部署级兜底代理（如 `http://host.docker.internal:7890`、`socks5h://127.0.0.1:1080`），拉信、Token 刷新、IMAP socket 与自动授权都会走它；支持 `{mail}` 占位符。账号/分组已有配置优先。
+
 #### 步骤 2：构建并启动
 
 ```bash
@@ -433,6 +435,7 @@ socks5h://outlook.{mail}@127.0.0.1:2260
 - 建议优先 `socks5h://` / `socks5://`；普通 HTTP 代理对 IMAP 令牌请求可能不可用
 - 不同邮箱前缀净化后可能碰撞（如 `a.b` 与 `ab`），本项目接受该行为
 - 上传账号自动授权：优先用上传记录自己的 `proxy_url`，否则继承分组代理模板
+- 账号与分组均未配置代理时，`GLOBAL_PROXY_URL` 环境变量可作为部署级兜底代理，同样支持 `{mail}` 占位符
 - 默认 `LOG_LEVEL=INFO` 会在拉信 / Token 刷新 / 自动授权时打印 `[代理]` 详情（密码打码）。批量场景日志较多时，设 `LOG_LEVEL=WARNING` 即可降噪关闭这类 INFO
 - 友情项目：[Resin](https://github.com/Resinat/Resin)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -1184,6 +1186,26 @@ def get_empty_proxy_config() -> Dict[str, str]:
     }
 
 
+GLOBAL_PROXY_URL_ENV = 'GLOBAL_PROXY_URL'
+
+
+def get_global_proxy_url() -> str:
+    """部署级主代理兜底：账号与分组均未配置代理时读取环境变量 GLOBAL_PROXY_URL。"""
+    return str(os.environ.get(GLOBAL_PROXY_URL_ENV, '') or '').strip()
+
+
+def apply_global_proxy_fallback(
+    proxy_config: Optional[Dict[str, str]], email: Any = None
+) -> Dict[str, str]:
+    """解析结果无主代理时注入 GLOBAL_PROXY_URL（同样展开 {mail}），不覆盖账号/分组配置。"""
+    config = dict(proxy_config or get_empty_proxy_config())
+    if not str(config.get('proxy_url') or '').strip():
+        global_proxy_url = get_global_proxy_url()
+        if global_proxy_url:
+            config['proxy_url'] = expand_proxy_url_template(global_proxy_url, email)
+    return config
+
+
 def get_account_override_proxy_config(account: Optional[Dict[str, Any]]) -> Dict[str, str]:
     if not account:
         return get_empty_proxy_config()
@@ -1212,33 +1234,34 @@ def get_account_proxy_config(account: Optional[Dict[str, Any]], db=None) -> Dict
 
 
 def get_account_resolved_proxy_config(account: Optional[Dict[str, Any]], db=None) -> Dict[str, str]:
-    """出站网络用代理：继承解析后再展开 {mail}。"""
+    """出站网络用代理：继承解析并展开 {mail}，无配置时兜底 GLOBAL_PROXY_URL。"""
     email = account.get('email') if account else None
-    return expand_proxy_config(get_account_proxy_config(account, db=db), email)
+    resolved = expand_proxy_config(get_account_proxy_config(account, db=db), email)
+    return apply_global_proxy_fallback(resolved, email)
 
 
 def get_upload_account_resolved_proxy_config(upload_row: Any, db=None) -> Dict[str, str]:
-    """上传账号自动授权用代理：自身 proxy_url 优先，否则分组继承，再展开 {mail}。"""
-    if not upload_row:
-        return get_empty_proxy_config()
-    row = dict(upload_row) if hasattr(upload_row, 'keys') else dict(upload_row or {})
-    email = row.get('email')
-    own_proxy = str(row.get('proxy_url') or '').strip()
-    if own_proxy:
-        return expand_proxy_config(
-            {
+    """上传账号自动授权用代理：自身 proxy_url 优先，否则分组继承，再展开 {mail}，最后兜底全局代理。"""
+    resolved = get_empty_proxy_config()
+    email = None
+    if upload_row:
+        row = dict(upload_row) if hasattr(upload_row, 'keys') else dict(upload_row or {})
+        email = row.get('email')
+        own_proxy = str(row.get('proxy_url') or '').strip()
+        if own_proxy:
+            resolved = {
                 'proxy_url': own_proxy,
                 'fallback_proxy_url_1': '',
                 'fallback_proxy_url_2': '',
-            },
-            email,
-        )
-    group_id = row.get('group_id')
-    if group_id:
-        group = get_group_by_id(group_id, db=db)
-        if group:
-            return expand_proxy_config(get_group_inherited_proxy_config(group, db=db), email)
-    return get_empty_proxy_config()
+            }
+        else:
+            group_id = row.get('group_id')
+            if group_id:
+                group = get_group_by_id(group_id, db=db)
+                if group:
+                    resolved = get_group_inherited_proxy_config(group, db=db)
+    resolved = expand_proxy_config(resolved, email)
+    return apply_global_proxy_fallback(resolved, email)
 
 
 def get_group_inherited_proxy_config(group_row: Optional[Dict[str, Any]], db=None) -> Dict[str, str]:
