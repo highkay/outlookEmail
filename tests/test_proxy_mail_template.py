@@ -211,6 +211,16 @@ class ProxyMailTemplateTests(unittest.TestCase):
                 })
                 self.assertEqual(resolved['proxy_url'], 'http://global.example:7890')
 
+    def test_upload_account_own_proxy_beats_global_env_fallback(self):
+        with self.app.app_context():
+            with patch.dict(os.environ, {web_outlook_app.GLOBAL_PROXY_URL_ENV: 'http://global.example:7890'}):
+                resolved = web_outlook_app.get_upload_account_resolved_proxy_config({
+                    'email': 'Own.User@example.com',
+                    'proxy_url': 'socks5h://outlook.{mail}:own@127.0.0.1:2260',
+                    'group_id': None,
+                })
+                self.assertEqual(resolved['proxy_url'], 'socks5h://outlook.ownuser:own@127.0.0.1:2260')
+
     def test_upload_account_proxy_own_then_group_inheritance(self):
         with self.app.app_context():
             group_id = web_outlook_app.add_group(
