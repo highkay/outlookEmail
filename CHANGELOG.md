@@ -6,10 +6,25 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
-## [3.0.7] - 2026-09-04
+## [3.0.8] - 2026-09-18
+
+### Added
+- 账号列表标签筛选支持“有 / 无”双状态：多个“有”标签按任一匹配，多个“无”标签要求全部不包含，两类条件可以组合使用。
+- `GET /api/accounts` 与 `GET /api/accounts/search` 新增 `exclude_tag_ids`，支持逗号分隔、重复参数和两种形式混合传递。
+
+### Important
+- **行为变化：** 升级后会清除浏览器本地旧版标签筛选偏好中的 `__untagged__` 值；原来的“无标签”筛选不会自动迁移为新的筛选条件。
+
+## [3.0.7] - 2026-09-15
+
+### Added
+- 分组面板新增“显示分组描述”开关：默认保持紧凑列表，开启后展示非空分组描述，并按浏览器记忆展示偏好；长描述最多显示两行，悬浮可查看全文（#82）。
+
+## [3.0.7-fork] - 2026-09-04
 
 ### Added
 - 部署级全局代理兜底 `GLOBAL_PROXY_URL`：账号与分组均未配置代理时，拉信、Token 刷新、IMAP socket、Graph/IMAP OAuth 自动授权等出站统一走该环境变量指定的代理；支持 `{mail}` 占位符展开（Resin 粘性代理可用）。账号/分组已配置的代理优先级不变。
+
 
 ## [3.0.6] - 2026-08-20
 
